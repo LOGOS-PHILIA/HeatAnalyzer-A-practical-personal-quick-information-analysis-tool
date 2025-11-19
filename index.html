@@ -1,0 +1,1165 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>热析 (HeatAnalyzer) - 热搜议题分类分析工具</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        :root {
+            --primary: #0a0a0f;
+            --secondary: #151521;
+            --accent: #1a365d;
+            --highlight: #2d5aa0;
+            --light: #4a5568;
+            --text: #e2e8f0;
+            --text-secondary: #a0aec0;
+            --success: #2d7d46;
+            --warning: #b7791f;
+            --danger: #c53030;
+            --gradient: linear-gradient(135deg, #0a0a0f 0%, #151521 50%, #1a365d 100%);
+        }
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', 'Inter', system-ui, -apple-system, sans-serif;
+        }
+        
+        body {
+            background: var(--primary);
+            color: var(--text);
+            line-height: 1.6;
+            min-height: 100vh;
+        }
+        
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        
+        header {
+            text-align: center;
+            margin-bottom: 40px;
+            padding: 40px 20px;
+            background: var(--gradient);
+            border-radius: 12px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+            color: var(--text);
+            position: relative;
+            overflow: hidden;
+            border: 1px solid var(--light);
+        }
+        
+        header::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 3px;
+            background: linear-gradient(90deg, var(--highlight), var(--text));
+        }
+        
+        h1 {
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+            font-weight: 700;
+            letter-spacing: -0.5px;
+            background: linear-gradient(90deg, var(--text), var(--highlight));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        
+        .subtitle {
+            font-size: 1.2rem;
+            margin-bottom: 15px;
+            opacity: 0.9;
+            font-weight: 400;
+            color: var(--text-secondary);
+        }
+        
+        .tagline {
+            font-style: italic;
+            opacity: 0.8;
+            font-size: 1rem;
+            color: var(--text-secondary);
+        }
+        
+        .progress-container {
+            margin: 40px 0;
+            background: var(--secondary);
+            padding: 25px;
+            border-radius: 12px;
+            box-shadow: 0 5px 20px rgba(0,0,0,0.2);
+            border: 1px solid var(--light);
+        }
+        
+        .progress-bar {
+            height: 10px;
+            background: var(--primary);
+            border-radius: 10px;
+            overflow: hidden;
+            margin-bottom: 15px;
+            position: relative;
+        }
+        
+        .progress {
+            height: 100%;
+            background: linear-gradient(90deg, var(--accent), var(--highlight));
+            width: 0%;
+            transition: width 0.5s ease;
+            border-radius: 10px;
+        }
+        
+        .progress-text {
+            text-align: center;
+            font-size: 1rem;
+            color: var(--text);
+            font-weight: 500;
+        }
+        
+        .section {
+            background: var(--secondary);
+            margin-bottom: 25px;
+            padding: 35px;
+            border-radius: 12px;
+            box-shadow: 0 5px 20px rgba(0,0,0,0.2);
+            border: 1px solid var(--light);
+            display: none;
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+        
+        .section:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(0,0,0,0.3);
+        }
+        
+        .section.active {
+            display: block;
+            animation: fadeIn 0.5s ease;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        .section-title {
+            color: var(--text);
+            margin-bottom: 25px;
+            padding-bottom: 15px;
+            border-bottom: 2px solid var(--light);
+            font-size: 1.5rem;
+            font-weight: 600;
+        }
+        
+        .question {
+            margin-bottom: 30px;
+        }
+        
+        .question-text {
+            font-weight: 600;
+            margin-bottom: 18px;
+            color: var(--text);
+            font-size: 1.1rem;
+            line-height: 1.5;
+        }
+        
+        .options {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+        
+        .option {
+            padding: 16px 20px;
+            border: 2px solid var(--light);
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-weight: 500;
+            position: relative;
+            overflow: hidden;
+            background: var(--primary);
+        }
+        
+        .option:hover {
+            border-color: var(--highlight);
+            background: rgba(45, 90, 160, 0.1);
+            transform: translateX(5px);
+        }
+        
+        .option.selected {
+            border-color: var(--highlight);
+            background: rgba(45, 90, 160, 0.2);
+            box-shadow: 0 4px 12px rgba(45, 90, 160, 0.3);
+        }
+        
+        .buttons {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 40px;
+        }
+        
+        button {
+            padding: 14px 30px;
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            font-size: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .btn-prev {
+            background: var(--primary);
+            color: var(--text);
+            border: 2px solid var(--light);
+        }
+        
+        .btn-prev:hover {
+            background: var(--accent);
+            transform: translateX(-3px);
+        }
+        
+        .btn-next {
+            background: var(--accent);
+            color: var(--text);
+            box-shadow: 0 4px 15px rgba(15, 76, 117, 0.3);
+        }
+        
+        .btn-next:hover {
+            background: var(--highlight);
+            transform: translateX(3px);
+            box-shadow: 0 6px 20px rgba(15, 76, 117, 0.4);
+        }
+        
+        .btn-generate {
+            background: var(--highlight);
+            color: var(--text);
+            width: 100%;
+            box-shadow: 0 4px 15px rgba(50, 130, 184, 0.3);
+        }
+        
+        .btn-generate:hover {
+            background: #2a6fa3;
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(50, 130, 184, 0.4);
+        }
+        
+        .report-container {
+            background: var(--secondary);
+            padding: 40px;
+            border-radius: 12px;
+            box-shadow: 0 5px 20px rgba(0,0,0,0.2);
+            display: none;
+            border: 1px solid var(--light);
+        }
+        
+        .report-header {
+            text-align: center;
+            margin-bottom: 40px;
+            padding-bottom: 30px;
+            border-bottom: 2px solid var(--light);
+        }
+        
+        .report-title {
+            color: var(--text);
+            margin-bottom: 15px;
+            font-size: 2rem;
+        }
+        
+        .report-section {
+            margin-bottom: 40px;
+        }
+        
+        .report-section-title {
+            color: var(--text);
+            margin-bottom: 20px;
+            font-size: 1.4rem;
+            font-weight: 600;
+            padding-bottom: 10px;
+            border-bottom: 1px solid var(--light);
+        }
+        
+        .dimension-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 20px;
+            margin-bottom: 25px;
+        }
+        
+        .dimension {
+            padding: 20px;
+            border-radius: 10px;
+            background: var(--primary);
+            border-left: 4px solid var(--highlight);
+            transition: transform 0.3s ease;
+        }
+        
+        .dimension:hover {
+            transform: translateY(-3px);
+        }
+        
+        .dimension-name {
+            font-weight: 600;
+            margin-bottom: 8px;
+            color: var(--text);
+        }
+        
+        .dimension-value {
+            font-size: 1.2rem;
+            font-weight: 600;
+        }
+        
+        .alert-box {
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 25px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+        }
+        
+        .alert-high {
+            background: rgba(197, 48, 48, 0.1);
+            border-left: 4px solid var(--danger);
+        }
+        
+        .alert-medium {
+            background: rgba(183, 121, 31, 0.1);
+            border-left: 4px solid var(--warning);
+        }
+        
+        .alert-warning {
+            background: rgba(183, 121, 31, 0.1);
+            border-left: 4px solid var(--warning);
+        }
+        
+        .alert-low {
+            background: rgba(45, 125, 70, 0.1);
+            border-left: 4px solid var(--success);
+        }
+        
+        .insight-box {
+            padding: 25px;
+            background: var(--primary);
+            border-radius: 10px;
+            font-style: italic;
+            margin-bottom: 25px;
+            border-left: 4px solid var(--accent);
+            position: relative;
+        }
+        
+        .insight-box::before {
+            content: '"';
+            position: absolute;
+            top: 10px;
+            left: 15px;
+            font-size: 3rem;
+            color: var(--light);
+            font-family: serif;
+        }
+        
+        .explanation-box {
+            padding: 20px;
+            background: var(--primary);
+            border-radius: 10px;
+            margin-bottom: 20px;
+            font-size: 1rem;
+            line-height: 1.6;
+            border-left: 4px solid var(--highlight);
+        }
+        
+        .chart-container {
+            width: 100%;
+            height: 300px;
+            margin: 30px 0;
+            position: relative;
+        }
+        
+        input[type="text"], input[type="number"], select {
+            width: 100%;
+            padding: 15px;
+            border: 2px solid var(--light);
+            border-radius: 10px;
+            font-size: 1rem;
+            transition: all 0.3s ease;
+            background: var(--primary);
+            color: var(--text);
+        }
+        
+        input[type="text"]:focus, input[type="number"]:focus, select:focus {
+            outline: none;
+            border-color: var(--highlight);
+            box-shadow: 0 0 0 3px rgba(50, 130, 184, 0.2);
+        }
+        
+        .hotspot-item {
+            padding: 20px;
+            border: 1px solid var(--light);
+            border-radius: 10px;
+            margin-bottom: 20px;
+            background: var(--primary);
+        }
+        
+        .hotspot-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+        
+        .hotspot-title {
+            font-weight: 600;
+            font-size: 1.1rem;
+        }
+        
+        .hotspot-controls {
+            display: flex;
+            gap: 10px;
+        }
+        
+        .hotspot-controls input, .hotspot-controls select {
+            width: auto;
+            min-width: 150px;
+        }
+        
+        .category-tag {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            font-weight: 600;
+        }
+        
+        .category-policy {
+            background: rgba(45, 125, 70, 0.2);
+            color: var(--success);
+        }
+        
+        .category-business {
+            background: rgba(52, 152, 219, 0.2);
+            color: #3498db;
+        }
+        
+        .category-entertainment {
+            background: rgba(155, 89, 182, 0.2);
+            color: #9b59b6;
+        }
+        
+        .category-news {
+            background: rgba(241, 196, 15, 0.2);
+            color: #f1c40f;
+        }
+        
+        .category-other {
+            background: rgba(149, 165, 166, 0.2);
+            color: #95a5a6;
+        }
+        
+        @media (max-width: 768px) {
+            .dimension-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            h1 {
+                font-size: 2rem;
+            }
+            
+            .section {
+                padding: 25px;
+            }
+            
+            .hotspot-header {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 10px;
+            }
+            
+            .hotspot-controls {
+                width: 100%;
+                justify-content: space-between;
+            }
+            
+            .hotspot-controls input, .hotspot-controls select {
+                width: 48%;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>热析 (HeatAnalyzer)</h1>
+            <div class="subtitle">热搜议题分类分析工具</div>
+            <div class="subtitle">通过客观归类增强您的主动公众议题选择能力</div>
+            <div class="tagline">逻各爱 · 让每一份情感投入创造真实价值</div>
+        </header>
+        
+        <div class="progress-container">
+            <div class="progress-bar">
+                <div class="progress" id="progress"></div>
+            </div>
+            <div class="progress-text" id="progress-text">进度 1 / 4</div>
+        </div>
+        
+        <!-- 引导页 -->
+        <div class="section active" id="section-0">
+            <h2 class="section-title">热析：可视化您的注意力分配</h2>
+            <div class="explanation-box">
+                <p>本工具帮助您分析信息获取模式，识别情绪触发词，优化公众参与效率。</p>
+                <p>热析不仅可用于热搜分析，还可帮助您可视化信息获取的注意力分配状况。</p>
+            </div>
+            
+            <div class="question">
+                <div class="question-text">请选择要分析的内容数量：</div>
+                <div class="options">
+                    <div class="option" data-value="5">5条内容（快速分析）</div>
+                    <div class="option" data-value="10">10条内容（完整分析）</div>
+                </div>
+            </div>
+            
+            <div class="buttons">
+                <button class="btn-prev" style="visibility: hidden;">上一步</button>
+                <button class="btn-next">开始分析</button>
+            </div>
+        </div>
+        
+        <!-- 内容录入页 -->
+        <div class="section" id="section-1">
+            <h2 class="section-title">录入分析内容</h2>
+            <div class="explanation-box">
+                <p>请从热搜、新闻或其他信息源中复制标题，完整记录在下方。</p>
+            </div>
+            
+            <div id="hotspot-container">
+                <!-- 动态生成的内容输入项 -->
+            </div>
+            
+            <div class="buttons">
+                <button class="btn-prev">上一步</button>
+                <button class="btn-next">下一步</button>
+            </div>
+        </div>
+        
+        <!-- 情绪识别与归类页 -->
+        <div class="section" id="section-2">
+            <h2 class="section-title">情绪识别与内容归类</h2>
+            <div class="explanation-box">
+                <p>请为每条内容识别情绪词数量，提炼核心事实，并归类内容领域。</p>
+            </div>
+            
+            <div id="analysis-container">
+                <!-- 动态生成的分析项 -->
+            </div>
+            
+            <div class="buttons">
+                <button class="btn-prev">上一步</button>
+                <button class="btn-next">下一步</button>
+            </div>
+        </div>
+        
+        <!-- 关注类型与反思页 -->
+        <div class="section" id="section-3">
+            <h2 class="section-title">关注类型与反思</h2>
+            <div class="explanation-box">
+                <p>请为每条内容选择您的关注类型，完成分析后查看统计结果。</p>
+            </div>
+            
+            <div id="reflection-container">
+                <!-- 动态生成的反思项 -->
+            </div>
+            
+            <div class="buttons">
+                <button class="btn-prev">上一步</button>
+                <button class="btn-generate">生成分析报告</button>
+            </div>
+        </div>
+        
+        <!-- 报告容器 -->
+        <div class="report-container" id="report-container">
+            <div class="report-header">
+                <h2 class="report-title">热析分析报告</h2>
+                <div class="report-id" id="report-id">分析编号: HEAT-<span id="timestamp"></span>-<span id="random-code"></span></div>
+            </div>
+            
+            <div class="report-section">
+                <h3 class="report-section-title">内容分布统计</h3>
+                <div class="dimension-grid">
+                    <div class="dimension">
+                        <div class="dimension-name">公共政策</div>
+                        <div class="dimension-value" id="policy-value">0</div>
+                    </div>
+                    <div class="dimension">
+                        <div class="dimension-name">商业资讯-营销</div>
+                        <div class="dimension-value" id="business-value">0</div>
+                    </div>
+                    <div class="dimension">
+                        <div class="dimension-name">娱乐新闻-明星八卦</div>
+                        <div class="dimension-value" id="entertainment-value">0</div>
+                    </div>
+                    <div class="dimension">
+                        <div class="dimension-name">社会新闻</div>
+                        <div class="dimension-value" id="news-value">0</div>
+                    </div>
+                    <div class="dimension">
+                        <div class="dimension-name">其他类</div>
+                        <div class="dimension-value" id="other-value">0</div>
+                    </div>
+                </div>
+                
+                <div class="chart-container">
+                    <canvas id="chart"></canvas>
+                </div>
+            </div>
+            
+            <div class="report-section">
+                <h3 class="report-section-title">情绪词使用分析</h3>
+                <div class="dimension-grid">
+                    <div class="dimension">
+                        <div class="dimension-name">情绪词总数</div>
+                        <div class="dimension-value" id="emotion-total">0</div>
+                    </div>
+                    <div class="dimension">
+                        <div class="dimension-name">平均每条内容情绪词</div>
+                        <div class="dimension-value" id="emotion-average">0</div>
+                    </div>
+                    <div class="dimension">
+                        <div class="dimension-name">情绪词最多内容</div>
+                        <div class="dimension-value" id="emotion-max">无</div>
+                    </div>
+                    <div class="dimension">
+                        <div class="dimension-name">情绪词最少内容</div>
+                        <div class="dimension-value" id="emotion-min">无</div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="report-section">
+                <h3 class="report-section-title">关注类型分析</h3>
+                <div class="dimension-grid">
+                    <div class="dimension">
+                        <div class="dimension-name">主动关注内容</div>
+                        <div class="dimension-value" id="active-value">0</div>
+                    </div>
+                    <div class="dimension">
+                        <div class="dimension-name">被动关注内容</div>
+                        <div class="dimension-value" id="passive-value">0</div>
+                    </div>
+                    <div class="dimension">
+                        <div class="dimension-name">注意力配置效率</div>
+                        <div class="dimension-value" id="efficiency-value">低</div>
+                    </div>
+                </div>
+                
+                <div class="alert-box" id="alert-box">
+                    <!-- 动态内容 -->
+                </div>
+            </div>
+            
+            <div class="report-section">
+                <h3 class="report-section-title">优化建议</h3>
+                <div class="insight-box" id="insight-box">
+                    <!-- 动态内容 -->
+                </div>
+                
+                <div class="explanation-box">
+                    <p><strong>注意力优化策略：</strong></p>
+                    <ul>
+                        <li>减少对娱乐新闻和商业营销类内容的深度参与</li>
+                        <li>将节省的时间投入到个人发展或真正关心的公共政策议题</li>
+                        <li>关注官方渠道参与公共讨论，避免在商业平台消耗精力</li>
+                    </ul>
+                </div>
+            </div>
+            
+            <button class="btn-generate" id="btn-restart">重新开始分析</button>
+        </div>
+    </div>
+
+    <script>
+        // 全局变量
+        let currentSection = 0;
+        const totalSections = 4;
+        let hotspotCount = 5;
+        const hotspots = [];
+        
+        // DOM 加载完成后初始化
+        document.addEventListener('DOMContentLoaded', function() {
+            initializeApp();
+        });
+        
+        function initializeApp() {
+            // 设置进度条
+            updateProgress();
+            
+            // 绑定选项点击事件
+            document.querySelectorAll('.option').forEach(option => {
+                option.addEventListener('click', function() {
+                    // 清除同一问题中其他选项的选中状态
+                    const question = this.closest('.question');
+                    question.querySelectorAll('.option').forEach(opt => {
+                        opt.classList.remove('selected');
+                    });
+                    
+                    // 选中当前选项
+                    this.classList.add('selected');
+                    
+                    // 如果是内容数量选择
+                    if (this.closest('#section-0')) {
+                        hotspotCount = parseInt(this.getAttribute('data-value'));
+                    }
+                });
+            });
+            
+            // 绑定下一步按钮事件
+            document.querySelectorAll('.btn-next').forEach(button => {
+                button.addEventListener('click', function() {
+                    if (validateSection(currentSection)) {
+                        saveSectionAnswers(currentSection);
+                        currentSection++;
+                        
+                        if (currentSection === 1) {
+                            createHotspotInputs();
+                        } else if (currentSection === 2) {
+                            createAnalysisInputs();
+                        } else if (currentSection === 3) {
+                            createReflectionInputs();
+                        }
+                        
+                        showSection(currentSection);
+                        updateProgress();
+                    } else {
+                        alert('请完成当前部分的所有问题');
+                    }
+                });
+            });
+            
+            // 绑定上一步按钮事件
+            document.querySelectorAll('.btn-prev').forEach(button => {
+                button.addEventListener('click', function() {
+                    currentSection--;
+                    showSection(currentSection);
+                    updateProgress();
+                });
+            });
+            
+            // 绑定生成报告按钮事件
+            document.querySelector('.btn-generate').addEventListener('click', function() {
+                if (validateSection(currentSection)) {
+                    saveSectionAnswers(currentSection);
+                    generateReport();
+                } else {
+                    alert('请完成当前部分的所有问题');
+                }
+            });
+            
+            // 绑定重新开始按钮事件
+            document.getElementById('btn-restart').addEventListener('click', function() {
+                resetApp();
+            });
+        }
+        
+        function updateProgress() {
+            const progress = document.getElementById('progress');
+            const progressText = document.getElementById('progress-text');
+            
+            const percentage = (currentSection / (totalSections - 1)) * 100;
+            progress.style.width = `${percentage}%`;
+            
+            let stepText = '';
+            if (currentSection === 0) {
+                stepText = '引导页';
+            } else if (currentSection === 1) {
+                stepText = '录入分析内容';
+            } else if (currentSection === 2) {
+                stepText = '情绪识别与归类';
+            } else if (currentSection === 3) {
+                stepText = '关注类型与反思';
+            }
+            
+            progressText.textContent = `进度 ${currentSection + 1} / ${totalSections} - ${stepText}`;
+        }
+        
+        function showSection(sectionIndex) {
+            // 隐藏所有部分
+            document.querySelectorAll('.section').forEach(section => {
+                section.classList.remove('active');
+            });
+            
+            // 显示当前部分
+            document.getElementById(`section-${sectionIndex}`).classList.add('active');
+            
+            // 更新按钮可见性
+            document.querySelectorAll('.btn-prev').forEach(button => {
+                if (sectionIndex === 0) {
+                    button.style.visibility = 'hidden';
+                } else {
+                    button.style.visibility = 'visible';
+                }
+            });
+        }
+        
+        function validateSection(sectionIndex) {
+            if (sectionIndex === 0) {
+                // 验证是否选择了内容数量
+                const selectedOption = document.querySelector('#section-0 .option.selected');
+                return !!selectedOption;
+            } else if (sectionIndex === 1) {
+                // 验证所有内容标题是否已填写
+                const inputs = document.querySelectorAll('#hotspot-container input');
+                for (let input of inputs) {
+                    if (!input.value.trim()) {
+                        return false;
+                    }
+                }
+                return true;
+            } else if (sectionIndex === 2) {
+                // 验证所有分析项是否已填写
+                const emotionInputs = document.querySelectorAll('.emotion-input');
+                const factInputs = document.querySelectorAll('.fact-input');
+                const categorySelects = document.querySelectorAll('.category-select');
+                
+                for (let input of emotionInputs) {
+                    if (!input.value) return false;
+                }
+                for (let input of factInputs) {
+                    if (!input.value.trim()) return false;
+                }
+                for (let select of categorySelects) {
+                    if (!select.value) return false;
+                }
+                return true;
+            } else if (sectionIndex === 3) {
+                // 验证所有关注类型是否已选择
+                const attentionSelects = document.querySelectorAll('.attention-select');
+                for (let select of attentionSelects) {
+                    if (!select.value) return false;
+                }
+                return true;
+            }
+            return true;
+        }
+        
+        function saveSectionAnswers(sectionIndex) {
+            if (sectionIndex === 1) {
+                // 保存内容标题
+                hotspots.length = 0; // 清空数组
+                const inputs = document.querySelectorAll('#hotspot-container input');
+                inputs.forEach(input => {
+                    hotspots.push({
+                        title: input.value.trim(),
+                        emotionCount: 0,
+                        coreFact: '',
+                        category: '',
+                        attentionType: ''
+                    });
+                });
+            } else if (sectionIndex === 2) {
+                // 保存情绪识别和归类
+                const emotionInputs = document.querySelectorAll('.emotion-input');
+                const factInputs = document.querySelectorAll('.fact-input');
+                const categorySelects = document.querySelectorAll('.category-select');
+                
+                emotionInputs.forEach((input, index) => {
+                    hotspots[index].emotionCount = parseInt(input.value) || 0;
+                });
+                
+                factInputs.forEach((input, index) => {
+                    hotspots[index].coreFact = input.value.trim();
+                });
+                
+                categorySelects.forEach((select, index) => {
+                    hotspots[index].category = select.value;
+                });
+            } else if (sectionIndex === 3) {
+                // 保存关注类型
+                const attentionSelects = document.querySelectorAll('.attention-select');
+                attentionSelects.forEach((select, index) => {
+                    hotspots[index].attentionType = select.value;
+                });
+            }
+        }
+        
+        function createHotspotInputs() {
+            const container = document.getElementById('hotspot-container');
+            container.innerHTML = '';
+            
+            for (let i = 0; i < hotspotCount; i++) {
+                const hotspotItem = document.createElement('div');
+                hotspotItem.className = 'hotspot-item';
+                hotspotItem.innerHTML = `
+                    <div class="hotspot-header">
+                        <div class="hotspot-title">内容 #${i+1}</div>
+                    </div>
+                    <input type="text" placeholder="请输入内容标题" value="${hotspots[i] ? hotspots[i].title : ''}">
+                `;
+                container.appendChild(hotspotItem);
+            }
+        }
+        
+        function createAnalysisInputs() {
+            const container = document.getElementById('analysis-container');
+            container.innerHTML = '';
+            
+            hotspots.forEach((hotspot, index) => {
+                const analysisItem = document.createElement('div');
+                analysisItem.className = 'hotspot-item';
+                analysisItem.innerHTML = `
+                    <div class="hotspot-header">
+                        <div class="hotspot-title">${hotspot.title}</div>
+                    </div>
+                    <div class="question">
+                        <div class="question-text">情绪词数量：</div>
+                        <input type="number" min="0" class="emotion-input" placeholder="输入情绪词数量" value="${hotspot.emotionCount}">
+                    </div>
+                    <div class="question">
+                        <div class="question-text">核心事实（去掉情绪词后）：</div>
+                        <input type="text" class="fact-input" placeholder="提炼核心事实" value="${hotspot.coreFact}">
+                    </div>
+                    <div class="question">
+                        <div class="question-text">内容归类：</div>
+                        <select class="category-select">
+                            <option value="">请选择归类</option>
+                            <option value="policy" ${hotspot.category === 'policy' ? 'selected' : ''}>公共政策</option>
+                            <option value="business" ${hotspot.category === 'business' ? 'selected' : ''}>商业资讯-营销</option>
+                            <option value="entertainment" ${hotspot.category === 'entertainment' ? 'selected' : ''}>娱乐新闻-明星八卦</option>
+                            <option value="news" ${hotspot.category === 'news' ? 'selected' : ''}>社会新闻</option>
+                            <option value="other" ${hotspot.category === 'other' ? 'selected' : ''}>其他类</option>
+                        </select>
+                    </div>
+                `;
+                container.appendChild(analysisItem);
+            });
+        }
+        
+        function createReflectionInputs() {
+            const container = document.getElementById('reflection-container');
+            container.innerHTML = '';
+            
+            hotspots.forEach((hotspot, index) => {
+                const reflectionItem = document.createElement('div');
+                reflectionItem.className = 'hotspot-item';
+                reflectionItem.innerHTML = `
+                    <div class="hotspot-header">
+                        <div class="hotspot-title">${hotspot.title}</div>
+                        <div class="category-tag category-${hotspot.category}">${getCategoryName(hotspot.category)}</div>
+                    </div>
+                    <div class="question">
+                        <div class="question-text">您的关注类型：</div>
+                        <select class="attention-select">
+                            <option value="">请选择关注类型</option>
+                            <option value="active" ${hotspot.attentionType === 'active' ? 'selected' : ''}>主动关注：我一直关心此领域</option>
+                            <option value="passive" ${hotspot.attentionType === 'passive' ? 'selected' : ''}>被动关注：因内容第一次了解</option>
+                        </select>
+                    </div>
+                `;
+                container.appendChild(reflectionItem);
+            });
+        }
+        
+        function getCategoryName(category) {
+            switch(category) {
+                case 'policy': return '公共政策';
+                case 'business': return '商业资讯';
+                case 'entertainment': return '娱乐新闻';
+                case 'news': return '社会新闻';
+                case 'other': return '其他类';
+                default: return '未归类';
+            }
+        }
+        
+        function generateReport() {
+            // 计算统计数据
+            const categoryCounts = {
+                policy: 0,
+                business: 0,
+                entertainment: 0,
+                news: 0,
+                other: 0
+            };
+            
+            const attentionCounts = {
+                active: 0,
+                passive: 0
+            };
+            
+            let totalEmotion = 0;
+            let maxEmotion = { count: -1, title: '' };
+            let minEmotion = { count: 1000, title: '' };
+            
+            hotspots.forEach(hotspot => {
+                // 统计分类
+                categoryCounts[hotspot.category]++;
+                
+                // 统计关注类型
+                attentionCounts[hotspot.attentionType]++;
+                
+                // 统计情绪词
+                totalEmotion += hotspot.emotionCount;
+                
+                if (hotspot.emotionCount > maxEmotion.count) {
+                    maxEmotion = { count: hotspot.emotionCount, title: hotspot.title };
+                }
+                
+                if (hotspot.emotionCount < minEmotion.count) {
+                    minEmotion = { count: hotspot.emotionCount, title: hotspot.title };
+                }
+            });
+            
+            // 更新报告内容
+            document.getElementById('policy-value').textContent = categoryCounts.policy;
+            document.getElementById('business-value').textContent = categoryCounts.business;
+            document.getElementById('entertainment-value').textContent = categoryCounts.entertainment;
+            document.getElementById('news-value').textContent = categoryCounts.news;
+            document.getElementById('other-value').textContent = categoryCounts.other;
+            
+            document.getElementById('emotion-total').textContent = totalEmotion;
+            document.getElementById('emotion-average').textContent = (totalEmotion / hotspots.length).toFixed(1);
+            document.getElementById('emotion-max').textContent = maxEmotion.title ? `${maxEmotion.title} (${maxEmotion.count}个)` : '无';
+            document.getElementById('emotion-min').textContent = minEmotion.title ? `${minEmotion.title} (${minEmotion.count}个)` : '无';
+            
+            document.getElementById('active-value').textContent = attentionCounts.active;
+            document.getElementById('passive-value').textContent = attentionCounts.passive;
+            
+            // 计算注意力配置效率
+            const entertainmentPassive = hotspots.filter(h => h.category === 'entertainment' && h.attentionType === 'passive').length;
+            const businessPassive = hotspots.filter(h => h.category === 'business' && h.attentionType === 'passive').length;
+            const passiveTotal = entertainmentPassive + businessPassive;
+            
+            let efficiencyLevel, efficiencyClass;
+            if (passiveTotal >= 3) {
+                efficiencyLevel = '低';
+                efficiencyClass = 'alert-high';
+            } else if (passiveTotal >= 1) {
+                efficiencyLevel = '中';
+                efficiencyClass = 'alert-medium';
+            } else {
+                efficiencyLevel = '高';
+                efficiencyClass = 'alert-low';
+            }
+            
+            document.getElementById('efficiency-value').textContent = efficiencyLevel;
+            
+            const alertBox = document.getElementById('alert-box');
+            alertBox.className = `alert-box ${efficiencyClass}`;
+            alertBox.innerHTML = `
+                <strong>注意力配置分析：</strong> 
+                您有 ${passiveTotal} 条内容属于被动关注的娱乐/商业类内容，可能存在"纯爱错误溢出"风险。
+                ${efficiencyLevel === '低' ? '建议立即减少此类内容的深度参与，将精力转向个人发展或主动关注的公共议题。' : 
+                  efficiencyLevel === '中' ? '建议关注此类内容的参与时间，避免过度消耗精力。' : 
+                  '您的注意力配置较为合理，继续保持。'}
+            `;
+            
+            // 生成洞察
+            const insightBox = document.getElementById('insight-box');
+            if (categoryCounts.entertainment > hotspots.length * 0.5) {
+                insightBox.textContent = "您的分析显示娱乐类内容占比过高。建议减少在明星八卦、影视剧集等内容上的时间投入，将注意力转向与个人发展更相关的领域。";
+            } else if (categoryCounts.policy < hotspots.length * 0.3) {
+                insightBox.textContent = "公共政策类内容在您的关注中占比较低。考虑增加对教育、医疗、就业等公共议题的关注，这些议题与您的长期利益更为相关。";
+            } else {
+                insightBox.textContent = "您的内容关注分布较为均衡。继续保持对多元内容的关注，同时注意区分主动关注与被动关注，优化注意力资源配置。";
+            }
+            
+            // 生成图表
+            createChart(categoryCounts);
+            
+            // 生成报告ID
+            const timestamp = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+            const randomCode = Math.random().toString(36).substring(2, 8).toUpperCase();
+            document.getElementById('timestamp').textContent = timestamp;
+            document.getElementById('random-code').textContent = randomCode;
+            
+            // 显示报告
+            document.querySelectorAll('.section').forEach(section => {
+                section.classList.remove('active');
+            });
+            document.getElementById('report-container').style.display = 'block';
+            
+            // 更新进度文本
+            document.getElementById('progress-text').textContent = '分析完成';
+            document.getElementById('progress').style.width = '100%';
+        }
+        
+        function createChart(categoryCounts) {
+            const ctx = document.getElementById('chart').getContext('2d');
+            
+            // 如果已有图表实例，先销毁
+            if (window.myChart) {
+                window.myChart.destroy();
+            }
+            
+            window.myChart = new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: ['公共政策', '商业资讯', '娱乐新闻', '社会新闻', '其他类'],
+                    datasets: [{
+                        data: [
+                            categoryCounts.policy, 
+                            categoryCounts.business, 
+                            categoryCounts.entertainment, 
+                            categoryCounts.news, 
+                            categoryCounts.other
+                        ],
+                        backgroundColor: [
+                            'rgba(45, 125, 70, 0.7)',
+                            'rgba(52, 152, 219, 0.7)',
+                            'rgba(155, 89, 182, 0.7)',
+                            'rgba(241, 196, 15, 0.7)',
+                            'rgba(149, 165, 166, 0.7)'
+                        ],
+                        borderColor: [
+                            'rgb(45, 125, 70)',
+                            'rgb(52, 152, 219)',
+                            'rgb(155, 89, 182)',
+                            'rgb(241, 196, 15)',
+                            'rgb(149, 165, 166)'
+                        ],
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'bottom',
+                            labels: {
+                                color: '#e2e8f0'
+                            }
+                        },
+                        title: {
+                            display: true,
+                            text: '内容分类分布',
+                            color: '#e2e8f0'
+                        }
+                    }
+                }
+            });
+        }
+        
+        function resetApp() {
+            currentSection = 0;
+            hotspotCount = 5;
+            hotspots.length = 0;
+            
+            // 重置所有选项
+            document.querySelectorAll('.option').forEach(option => {
+                option.classList.remove('selected');
+            });
+            
+            // 显示第一页
+            showSection(0);
+            updateProgress();
+            
+            // 隐藏报告
+            document.getElementById('report-container').style.display = 'none';
+        }
+    </script>
+</body>
+</html>
