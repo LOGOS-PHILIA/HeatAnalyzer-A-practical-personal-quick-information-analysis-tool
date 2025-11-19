@@ -4,7 +4,7 @@ A rational analysis system for classifying and evaluating public discourse conte
 System Introduction
 HeatAnalyzer helps users objectively analyze trending topics and media content by identifying emotional triggers, classifying content categories, and visualizing attention allocation patterns. The tool enables users to optimize their information consumption strategy and avoid "pure love error overflow" in public discourse participation.
 
-🔍 Analysis Modules
+📈 Analysis Modules
 Content Input & Classification - Record and categorize various content types from multiple sources
 
 Emotion Trigger Identification - Detect and quantify emotional language patterns
